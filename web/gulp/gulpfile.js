@@ -1,5 +1,6 @@
 "use strict";
 
+const dbManager = require('manage-database');
 const gulp = require('gulp');
 const Vinyl = require('vinyl');
 const del = require('del');
@@ -14,6 +15,14 @@ const uglify = require('gulp-uglify');
 const rename = require('gulp-rename');
 const imagemin = require('gulp-imagemin');
 const fs = require('fs');
+
+const db = dbManager({
+    user: 'root',
+    password: '',
+    host: 'localhost',
+    port: '3306',
+    dialect: 'mysql'
+});
 
 function clean() {
     return del(['./dist/**/mdb*.{css,js}', './dist/img/**/*.{png,jpg,svg,gif}']);
@@ -73,6 +82,28 @@ function jsMinify(){
         .pipe(gulp.dest('./dist/js'));
 }
 
+function createDb(done){
+    db.createAsync('foobar')
+        .then(function () {
+            console.log('Database created');
+        })
+        .catch(function (err) {
+            console.error(err);
+        });
+    done();
+}
+
+function dropDb(done){
+    db.dropAsync('foobar')
+        .then(function () {
+            console.log('Database deleted');
+        })
+        .catch(function (err) {
+            console.error(err);
+        });
+    done();
+}
+
 function imgCompression(){
     return gulp.src('./img/**/*')
         .pipe(imagemin([
@@ -116,14 +147,13 @@ function phpServer(done){
     done();
 }
 
-
-const images = gulp.series(imgCompression);
 const stylesCompile = gulp.parallel(cssCompile, cssCompileModules);
 const stylesMinify = gulp.parallel(cssMinify, cssMinifyModules);
 const styles = gulp.series(stylesCompile, stylesMinify);
 const scripts = gulp.series(jsBuild, jsMinify);
+const database = gulp.series(dropDb, createDb);
 
-const build = gulp.parallel(styles, scripts, images);
+const build = gulp.parallel(styles, scripts, imgCompression, database);
 const server = gulp.series(phpServer, webServer);
 
 function watchFiles(){
@@ -131,12 +161,13 @@ function watchFiles(){
     gulp.watch('./scss/**/*.scss', stylesCompile);
     gulp.watch(['./dist/css/**/*.css', '!./dist/css/**/*.min.css', '!./dist/css/bootstrap.css'], stylesMinify);
     gulp.watch('./js/**/*.js', scripts);
-    gulp.watch('**/*', {cwd: './img/'}, images);
+    gulp.watch('**/*', {cwd: './img/'}, imgCompression);
 }
 
 const run = gulp.series(clean, build, server, watchFiles);
 
-exports.img     = images;
+exports.db      = database;
+exports.img     = imgCompression;
 exports.css     = styles;
 exports.js      = scripts;
 exports.clean   = clean;
