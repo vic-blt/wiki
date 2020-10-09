@@ -1,2 +1,2 @@
-# D2T
-Dev Tips and Tools
+# Wiki
+Collection of tutos, docs...
